@@ -2,10 +2,9 @@
   "name": "scuttlebot",
   "description": "network protocol layer for secure-scuttlebutt",
   "version": "11.3.3",
-  "homepage": "https://github.com/ssbc/scuttlebot",
   "repository": {
     "type": "git",
-    "url": "git://github.com/ssbc/scuttlebot.git"
+    "url": "git://github.com/everlifeai/scuttlebot.git"
   },
   "dependencies": {
     "atomic-file": "0.0.1",
@@ -52,8 +51,8 @@
     "secret-stack": "^4.1.0",
     "secure-scuttlebutt": "^18.0.7",
     "ssb-blobs": "^1.1.4",
-    "ssb-client": "^4.5.7",
-    "ssb-config": "^2.0.0",
+    "ssb-client": "github:everlifeai/ssb-client",
+    "ssb-config": "github:everlifeai/ssb-config",
     "ssb-ebt": "^5.1.4",
     "ssb-friends": "^2.4.0",
     "ssb-keys": "^7.0.13",
@@ -61,7 +60,7 @@
     "ssb-msgs": "~5.2.0",
     "ssb-query": "^2.1.0",
     "ssb-ref": "^2.9.1",
-    "ssb-ws": "^2.1.1",
+    "ssb-ws": "github:everlifeai/ssb-ws",
     "statistics": "^3.0.0",
     "stream-to-pull-stream": "^1.6.10",
     "zerr": "^1.0.0"
