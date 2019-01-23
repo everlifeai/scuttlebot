@@ -6,8 +6,8 @@ var pull         = require('pull-stream')
 var toPull       = require('stream-to-pull-stream')
 var File         = require('pull-file')
 var explain      = require('explain-error')
-var ssbKeys      = require('ssb-keys')
-var stringify    = require('pull-stringify')
+var Config       = require('ssb-config/inject')
+var Client       = require('ssb-client')
 var createHash   = require('multiblob/util').createHash
 var minimist     = require('minimist')
 var muxrpcli     = require('muxrpcli')
@@ -22,43 +22,55 @@ var i = argv.indexOf('--')
 var conf = argv.slice(i+1)
 argv = ~i ? argv.slice(0, i) : argv
 
-var config = require('ssb-config/inject')(process.env.ssb_appname, minimist(conf))
+var config = Config(process.env.ssb_appname, minimist(conf))
 
-var keys = ssbKeys.loadOrCreateSync(path.join(config.path, 'secret'))
-if(keys.curve === 'k256')
+if (config.keys.curve === 'k256')
   throw new Error('k256 curves are no longer supported,'+
                   'please delete' + path.join(config.path, 'secret'))
 
 var manifestFile = path.join(config.path, 'manifest.json')
 
 if (argv[0] == 'server') {
+  console.log('WARNING-DEPRECATION: `sbot server` has been renamed to `ssb-server start`')
+  argv[0] = 'start'
+}
+
+if (argv[0] == 'start') {
   console.log(packageJson.name, packageJson.version, config.path, 'logging.level:'+config.logging.level)
-  console.log('my key ID:', keys.public)
+  console.log('my key ID:', config.keys.public)
 
-  // special server command:
-  // import sbot and start the server
+  // special start command:
+  // import ssbServer and start the server
 
-  var createSbot = require('./')
+  var createSsbServer = require('./')
+    .use(require('./plugins/onion'))
+    .use(require('./plugins/unix-socket'))
+    .use(require('./plugins/no-auth'))
     .use(require('./plugins/plugins'))
     .use(require('./plugins/master'))
-    .use(require('./plugins/gossip'))
-    .use(require('./plugins/replicate'))
+    .use(require('ssb-gossip'))
+    .use(require('ssb-replicate'))
     .use(require('ssb-friends'))
     .use(require('ssb-blobs'))
-    .use(require('./plugins/invite'))
+    .use(require('ssb-invite'))
     .use(require('./plugins/local'))
     .use(require('./plugins/logging'))
     .use(require('ssb-query'))
-    .use(require('ssb-links'))
     .use(require('ssb-ws'))
     .use(require('ssb-ebt'))
+    .use(require('ssb-ooo'))
   // add third-party plugins
-  require('./plugins/plugins').loadUserPlugins(createSbot, config)
+  require('./plugins/plugins').loadUserPlugins(createSsbServer, config)
+
+  if (argv[1] != '--disable-ssb-links') {
+    if (!createSsbServer.plugins.find(p => p.name == 'links2')) {
+      console.log("WARNING-DEPRECATION: ssb-links not installed as a plugin. If you are using git-ssb, ssb-npm or patchfoo please consider installing it")
+      createSsbServer.use(require('ssb-links'))
+    }
+  }
 
   // start server
-
-  config.keys = keys
-  var server = createSbot(config)
+  var server = createSsbServer(config)
 
   // write RPC manifest to ~/.ssb/manifest.json
   fs.writeFileSync(manifestFile, JSON.stringify(server.getManifest(), null, 2))
@@ -66,7 +78,6 @@ if (argv[0] == 'server') {
   if(process.stdout.isTTY && (config.logging.level != 'info'))
     ProgressBar(server.progress)
 } else {
-
   // normal command:
   // create a client connection to the server
 
@@ -81,18 +92,21 @@ if (argv[0] == 'server') {
     )
   }
 
-  // connect
-  require('ssb-client')(keys, {
+  var opts = {
     manifest: manifest,
     port: config.port,
-    host: config.host||'localhost',
+    host: config.host || 'localhost',
     caps: config.caps,
-    key: config.key || keys.id
-  }, function (err, rpc) {
+    key: config.key || config.keys.id
+  }
+
+  // connect
+  Client(config.keys, opts, function (err, rpc) {
     if(err) {
       if (/could not connect/.test(err.message)) {
-        console.log('Error: Could not connect to the scuttlebot server.')
-        console.log('Use the "server" command to start it.')
+        console.error('Error: Could not connect to ssb-server ' + opts.host + ':' + opts.port)
+        console.error('Use the "start" command to start it.')
+        console.error('Use --verbose option to see full error')
         if(config.verbose) throw err
         process.exit(1)
       }
@@ -106,12 +120,12 @@ if (argv[0] == 'server') {
     }
 
     // add some extra commands
-    manifest.version = 'async'
+//    manifest.version = 'async'
     manifest.config = 'sync'
-    rpc.version = function (cb) {
-      console.log(require('./package.json').version)
-      cb()
-    }
+//    rpc.version = function (cb) {
+//      console.log(packageJson.version)
+//      cb()
+//    }
     rpc.config = function (cb) {
       console.log(JSON.stringify(config, null, 2))
       cb()
@@ -150,7 +164,4 @@ if (argv[0] == 'server') {
     muxrpcli(argv, manifest, rpc, config.verbose)
   })
 }
-
-
-
 
