@@ -1,4 +1,4 @@
-# scuttlebot
+# ssb-server
 
 Secure-scuttlebutt API server
 
@@ -169,7 +169,7 @@ The range queries (gt, gte, lt, lte) filter against the sequence number.
 
 write a number of messages to the local store.
 will error if messages are not valid, but will accept
-messages that the sbot doesn't replicate.
+messages that the ssb-server doesn't replicate.
 
 
 ## links: source
@@ -199,44 +199,6 @@ The objects in this stream will be of the form:
  - `values` (boolean, default: `true`): whether the `data` event should contain values. If set to `true` and `keys` set to `false` then `data` events will simply be values, rather than objects with a `value` property.
 
 
-
-## relatedMessages: async
-
-Retrieve the tree of messages related to the given id.
-
-```bash
-relatedMessages --id {msgid} [--rel value] [--count] [--parent]
-```
-
-```js
-relatedMessages ({ id:, rel:, count:, parent: }, cb)
-```
-
-This is ideal for collecting things like threaded replies.
-The output is a recursive structure like this:
-
-``` js
-{
-  key: <id>,
-  value: <msg>,
-  related: [
-    <recursive>,...
-  ],
-  //number of messages below this point. (when opts.count = true)
-  count: <int>,
-  //the message this message links to. this will not appear on the bottom level.
-  //(when opts.parent = true)
-  parent: <parent_id>
-}
-```
-
- - `id` (MsgID): Root message, fetches messages related message to its ID.
- - `rel` (string, optional): Filters the links by the relation string.
- - `count` (boolean, default: `false`): Include a `count` of each message's decendant messages.
- - `parent` (boolean, default: `false`): Include the `parent` id of each message.
-
-
-
 ## add: async
 
 Add a well-formed message to the database.
@@ -262,7 +224,7 @@ add({ author:, sequence:, previous: timestamp:, hash: 'sha256', signature:, cont
 
 ## publish: async
 
-Construct a message using sbot's current user, and add it to the DB.
+Construct a message using ssb-server's current user, and add it to the DB.
 
 ```bash
 cat ./message-content.json | publish
@@ -283,14 +245,14 @@ This is the recommended method for publishing new messages, as it handles the ta
 
 ## getAddress: sync
 
-Get the address of the server.
+Get the address of the server. Default scope is public.
 
 ```bash
-getAddress
+getAddress {scope}
 ```
 
 ```js
-getAddress(cb)
+getAddress(scope, cb)
 ```
 
 
@@ -340,7 +302,7 @@ latest({feedId})
 
 ## whoami: sync
 
-Get information about the current sbot user.
+Get information about the current ssb-server user.
 
 ```bash
 whoami
@@ -373,3 +335,7 @@ such as db read activity, connection statuses, etc, etc. The purpose is to provi
 an overview of how ssb is working.
 
 ## getVectorClock: async
+
+## version: sync
+
+return the current version number of the running server

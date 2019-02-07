@@ -14,12 +14,11 @@ var mv = require('mv')
 var mdm = require('mdmanifest')
 var explain = require('explain-error')
 var valid = require('../lib/validators')
-var apidoc = require('../lib/apidocs').plugins
 
 module.exports = {
   name: 'plugins',
   version: '1.0.0',
-  manifest: mdm.manifest(apidoc),
+  manifest: mdm.manifest(fs.readFileSync(path.join(__dirname, 'plugins.md'), 'utf8')),
   permissions: {
     master: {allow: ['install', 'uninstall', 'enable', 'disable']}
   },
@@ -37,9 +36,9 @@ module.exports = {
           config.plugins[pluginName] = b 
           writePluginConfig(pluginName, b)
           if (b)
-            cb(null, '\''+pluginName+'\' has been enabled. Restart Scuttlebot server to use the plugin.')
+            cb(null, '\''+pluginName+'\' has been enabled. Restart ssb-server to use the plugin.')
           else
-            cb(null, '\''+pluginName+'\' has been disabled. Restart Scuttlebot server to stop using the plugin.')
+            cb(null, '\''+pluginName+'\' has been disabled. Restart ssb-server to stop using the plugin.')
         })
       }
     }
@@ -60,18 +59,29 @@ module.exports = {
     // write the plugin config to ~/.ssb/config
     function writePluginConfig (pluginName, value) {
       var cfgPath = path.join(config.path, 'config')
-      var existingConfig = {}
-      
       // load ~/.ssb/config
-      try { existingConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8')) }
-      catch (e) {}
+      let existingConfig
+      fs.readFile(cfgPath, 'utf-8', (err, data) => {
+        if (err) {
+          if (err.code === 'ENOENT') {
+            // only catch "file not found"
+            existingConfig = {}
+          } else {
+            throw err
+          }
+        } else {
+          existingConfig = JSON.parse(data)
+        }
 
-      // update the plugins config
-      existingConfig.plugins = existingConfig.plugins || {}
-      existingConfig.plugins[pluginName] = value
 
-      // write to disc
-      fs.writeFileSync(cfgPath, JSON.stringify(existingConfig, null, 2), 'utf-8')
+        // update the plugins config
+        existingConfig.plugins = existingConfig.plugins || {}
+        existingConfig.plugins[pluginName] = value
+
+        // write to disc
+        fs.writeFileSync(cfgPath, JSON.stringify(existingConfig, null, 2), 'utf-8')
+      })
+
     }
 
     return {
@@ -133,7 +143,7 @@ module.exports = {
                   var name = path.basename(pluginName)
                   config.plugins[name] = true
                   writePluginConfig(name, true)
-                  p.push(new Buffer('"'+pluginName+'" has been installed. Restart Scuttlebot server to enable the plugin.\n', 'utf-8'))
+                  p.push(Buffer.from('"'+pluginName+'" has been installed. Restart ssb-server to enable the plugin.\n', 'utf-8'))
                   p.end()
                 }
               )
@@ -141,7 +151,7 @@ module.exports = {
               p.end(new Error('"'+pluginName+'" failed to install. See log output above.'))
           })
         return cat([
-          pull.values([new Buffer('Installing "'+pluginName+'"...\n', 'utf-8')]),
+          pull.values([Buffer.from('Installing "'+pluginName+'"...\n', 'utf-8')]),
           many([toPull(child.stdout), toPull(child.stderr)]),
           p
         ])
@@ -156,7 +166,7 @@ module.exports = {
         rimraf(modulePath, function (err) {
           if (!err) {
             writePluginConfig(pluginName, false)
-            p.push(new Buffer('"'+pluginName+'" has been uninstalled. Restart Scuttlebot server to disable the plugin.\n', 'utf-8'))
+            p.push(Buffer.from('"'+pluginName+'" has been uninstalled. Restart ssb-server to disable the plugin.\n', 'utf-8'))
             p.end()
           } else
             p.end(err)
@@ -169,7 +179,7 @@ module.exports = {
   }
 }
 
-module.exports.loadUserPlugins = function (createSbot, config) {
+module.exports.loadUserPlugins = function (createSsbServer, config) {
   // iterate all modules
   var nodeModulesPath = path.join(config.path, 'node_modules')
   //instead of testing all plugins, only load things explicitly
@@ -180,19 +190,19 @@ module.exports.loadUserPlugins = function (createSbot, config) {
     if(name === true)
       name = /^ssb-/.test(module_name) ? module_name.substring(4) : module_name
 
-    if (createSbot.plugins.some(plug => plug.name === name))
+    if (createSsbServer.plugins.some(plug => plug.name === name))
       throw new Error('already loaded plugin named:'+name)
       var plugin = require(path.join(nodeModulesPath, module_name))
       if(!plugin || plugin.name !== name)
         throw new Error('plugin at:'+module_name+' expected name:'+name+' but had:'+(plugin||{}).name)
-      assertSbotPlugin(plugin)
-      createSbot.use(plugin)
+      assertSsbServerPlugin(plugin)
+      createSsbServer.use(plugin)
     }
   }
 }
 
-// predictate to check if an object appears to be a sbot plugin
-function assertSbotPlugin (obj) {
+// predictate to check if an object appears to be a ssbServer plugin
+function assertSsbServerPlugin (obj) {
   // function signature:
   if (typeof obj == 'function')
     return
@@ -214,5 +224,6 @@ function validatePluginName (name) {
     return false
   return true
 }
+
 
 

@@ -11,11 +11,13 @@ var u = require('./util')
 // give them all pub servers (on localhost)
 // and get them to follow each other...
 
-var createSbot = require('../')
-  .use(require('../plugins/replicate'))
-  .use(require('ssb-friends'))
-  .use(require('../plugins/gossip'))
-  .use(require('../plugins/logging'))
+var createSsbServer =
+  require('secret-stack')(require('./defaults'))
+    .use(require('ssb-db'))
+    .use(require('ssb-replicate'))
+    .use(require('ssb-friends'))
+    .use(require('ssb-gossip'))
+    .use(require('../plugins/logging'))
 
 var createHash = require('crypto').createHash
 
@@ -27,7 +29,7 @@ var sign_cap1 = hash('test-sign-cap1')
 var shs_cap1 = hash('test-shs-cap1')
 
 var alice, bob, carol
-var dbA = createSbot({
+var dbA = createSsbServer({
   temp: 'server-alice',
   port: 45451, timeout: 1400,
   keys: alice = ssbKeys.generate(),
@@ -39,7 +41,7 @@ var dbA = createSbot({
 })
 
 //uses default caps, incompatible with above
-var dbB = createSbot({
+var dbB = createSsbServer({
   temp: 'server-bob',
   port: 45452, timeout: 1400,
   keys: bob = ssbKeys.generate(),
@@ -48,7 +50,7 @@ var dbB = createSbot({
 })
 
 //can connect to A
-var dbC = createSbot({
+var dbC = createSsbServer({
   temp: 'server-carol',
   port: 45453, timeout: 1400,
   keys: alice = ssbKeys.generate(),
@@ -110,5 +112,6 @@ tape('cleanup', function (t) {
   dbC.close()
   t.end()
 })
+
 
 
